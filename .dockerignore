@@ -1,0 +1,5 @@
+.git
+.dvc/cache
+dvc-remote
+__pycache__
+*.pyc
