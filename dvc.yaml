@@ -1,0 +1,16 @@
+stages:
+  train:
+    cmd: python training/train.py --data-path data/raw/breast_cancer.csv --output-dir models --model-version v1.0
+    deps:
+      - data/raw/breast_cancer.csv
+      - params.yaml
+      - training/train.py
+    params:
+      - train
+      - logistic_regression
+      - random_forest
+    outs:
+      - models/model.joblib
+    metrics:
+      - models/model_card.json:
+          cache: false
