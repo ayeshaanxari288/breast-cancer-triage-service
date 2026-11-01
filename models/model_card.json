@@ -1,0 +1,55 @@
+{
+    "model_version": "v1.0",
+    "model_family": "LogisticRegression",
+    "ordered_feature_names": [
+        "mean radius",
+        "mean texture",
+        "mean perimeter",
+        "mean area",
+        "mean smoothness",
+        "mean compactness",
+        "mean concavity",
+        "mean concave points",
+        "mean symmetry",
+        "mean fractal dimension",
+        "radius error",
+        "texture error",
+        "perimeter error",
+        "area error",
+        "smoothness error",
+        "compactness error",
+        "concavity error",
+        "concave points error",
+        "symmetry error",
+        "fractal dimension error",
+        "worst radius",
+        "worst texture",
+        "worst perimeter",
+        "worst area",
+        "worst smoothness",
+        "worst compactness",
+        "worst concavity",
+        "worst concave points",
+        "worst symmetry",
+        "worst fractal dimension"
+    ],
+    "cv_metrics": {
+        "LogisticRegression": {
+            "cv_malignant_recall": 0.9515151515151515,
+            "cv_accuracy": 0.9721999465383586,
+            "cv_roc_auc": 0.9923977722719861
+        },
+        "RandomForest": {
+            "cv_malignant_recall": 0.9272727272727274,
+            "cv_accuracy": 0.9559208767709169,
+            "cv_roc_auc": 0.9904262753319356
+        }
+    },
+    "test_metrics": {
+        "malignant_recall": 0.975609756097561,
+        "accuracy": 0.9907407407407407,
+        "roc_auc": 0.995995631598107
+    },
+    "seed": 42,
+    "scikit_learn_version": "1.9.1"
+}

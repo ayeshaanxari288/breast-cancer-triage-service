@@ -1,120 +1,84 @@
 import os
-import sys
 import logging
-from contextlib import asynccontextmanager
 import joblib
 import pandas as pd
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field, field_validator
-from typing import List
+from pydantic import BaseModel
+import redis
 
-# 1. Environment Variables Read Karein
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-MODEL_PATH = os.getenv("MODEL_PATH", "models/model.joblib")
-DECISION_THRESHOLD = float(os.getenv("DECISION_THRESHOLD", "0.5"))
-
-# 2. Standard Output Logging Setup
-logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL, logging.INFO),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    stream=sys.stdout
-)
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 logger = logging.getLogger("fastapi_service")
 
-# Global model object
+app = FastAPI(title="Breast Cancer Prediction API")
+
+MODEL_PATH = os.getenv("MODEL_PATH", "models/model.joblib")
+DECISION_THRESHOLD = float(os.getenv("DECISION_THRESHOLD", "0.5"))
+REDIS_HOST = os.getenv("REDIS_HOST", None)
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+
 model = None
+redis_client = None
 
-# 3. Fail-Fast Model Loader at Startup (Lifespan)
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global model
-    logger.info(f"Loading model artifact from: '{MODEL_PATH}'...")
-    if not os.path.exists(MODEL_PATH):
-        logger.error(f"CRITICAL ERROR: Model file not found at '{MODEL_PATH}'. Failing fast!")
-        sys.exit(1)
-    
-    try:
+@app.on_event("startup")
+def load_model_and_redis():
+    global model, redis_client
+    # Load Model
+    if os.path.exists(MODEL_PATH):
         model = joblib.load(MODEL_PATH)
-        logger.info("Model successfully loaded into memory once at startup.")
-    except Exception as e:
-        logger.error(f"CRITICAL ERROR: Failed to load model artifact. Details: {e}")
-        sys.exit(1)
-        
-    yield
-    logger.info("Shutting down API service...")
+        logger.info(f"Model successfully loaded from {MODEL_PATH}")
+    else:
+        logger.error(f"Model file not found at {MODEL_PATH}")
 
-# FastAPI App Instance
-app = FastAPI(
-    title="Breast Cancer Prediction API",
-    description="MLOps Assignment 2 - FastAPI Model Serving",
-    version="1.0",
-    lifespan=lifespan
-)
+    # Connect to Redis if REDIS_HOST is set
+    if REDIS_HOST:
+        try:
+            redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, socket_timeout=2)
+            redis_client.ping()
+            logger.info(f"Successfully connected to Redis at {REDIS_HOST}:{REDIS_PORT}")
+        except Exception as e:
+            logger.warning(f"Redis connection failed: {e}. API will run without counter.")
+            redis_client = None
 
-# 4. Pydantic Request Body Validation Schema
-class CancerInput(BaseModel):
-    features: List[float] = Field(
-        ..., 
-        description="List of exactly 30 numerical features matching the breast cancer dataset."
-    )
-
-    @field_validator('features')
-    @classmethod
-    def check_30_features(cls, v):
-        if len(v) != 30:
-            raise ValueError(f"Expected exactly 30 feature values, but received {len(v)}.")
-        return v
-
-# 5. API Endpoints
-
-@app.get("/")
-def read_root():
-    return {"message": "Breast Cancer API Service is running."}
+class PatientData(BaseModel):
+    features: list[float]
 
 @app.get("/health")
 def health_check():
-    return {
-        "status": "healthy",
-        "model_loaded": model is not None,
-        "model_path": MODEL_PATH
-    }
+    if model is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    return {"status": "healthy", "threshold": DECISION_THRESHOLD}
 
 @app.get("/stats")
 def get_stats():
-    # Milestone 4 tak placeholder endpoint
-    return {
-        "status": "placeholder",
-        "message": "Stats endpoint placeholder for Milestone 4"
-    }
+    # Return count from Redis, or 0 if unreachable
+    if redis_client:
+        try:
+            count = redis_client.get("predict_counter")
+            return {"prediction_count": int(count) if count else 0}
+        except Exception as e:
+            logger.warning(f"Failed to fetch stats from Redis: {e}")
+    return {"prediction_count": 0, "note": "Redis counter unavailable"}
 
 @app.post("/predict")
-def predict(payload: CancerInput):
+def predict(data: PatientData):
     if model is None:
-        raise HTTPException(status_code=500, detail="Model is not loaded.")
+        raise HTTPException(status_code=503, detail="Model is not loaded")
+    
+    if len(data.features) != 30:
+        raise HTTPException(status_code=400, detail=f"Expected 30 features, got {len(data.features)}")
 
     try:
-        # Original dataset feature names in exact order
-        feature_names = [
-            'mean radius', 'mean texture', 'mean perimeter', 'mean area',
-            'mean smoothness', 'mean compactness', 'mean concavity',
-            'mean concave points', 'mean symmetry', 'mean fractal dimension',
-            'radius error', 'texture error', 'perimeter error', 'area error',
-            'smoothness error', 'compactness error', 'concavity error',
-            'concave points error', 'symmetry error', 'fractal dimension error',
-            'worst radius', 'worst texture', 'worst perimeter', 'worst area',
-            'worst smoothness', 'worst compactness', 'worst concavity',
-            'worst concave points', 'worst symmetry', 'worst fractal dimension'
-        ]
-        
-        df = pd.DataFrame([payload.features], columns=feature_names)
-        
-        # Class probabilities: index 0 = Malignant class
-        probabilities = model.predict_proba(df)[0]
-        malignant_prob = float(probabilities[0])
-        
+        df = pd.DataFrame([data.features])
+        probs = model.predict_proba(df)[0]
+        malignant_prob = float(probs[1])
         is_malignant = malignant_prob >= DECISION_THRESHOLD
 
-        logger.info(f"Prediction requested | Malignant Prob: {malignant_prob:.4f} | Decision Threshold: {DECISION_THRESHOLD}")
+        # Increment Redis Counter (Fail-safe: prediction won't break if Redis fails)
+        if redis_client:
+            try:
+                redis_client.incr("predict_counter")
+            except Exception as e:
+                logger.warning(f"Failed to increment Redis counter: {e}")
 
         return {
             "malignant_probability": malignant_prob,
