@@ -6,8 +6,8 @@ stages:
     deps:
     - path: data/raw/breast_cancer.csv
       hash: md5
-      md5: d7be26fe20e761af4a378dd3e5ab8e98
-      size: 115636
+      md5: 24d9881fad8cfb3d94f5276d372e422b
+      size: 121955
     - path: params.yaml
       hash: md5
       md5: cf16f4aa812ec42a65fbfbbc274c8c2e
@@ -31,9 +31,9 @@ stages:
     outs:
     - path: models/model.joblib
       hash: md5
-      md5: 1f61ce73838901db6bf2628b79aca15a
+      md5: 3eaadc1390af476869b27886b946763e
       size: 3073
     - path: models/model_card.json
       hash: md5
-      md5: 5bf7f986efdee56a3beb54c8cbb3578f
-      size: 1585
+      md5: f0cd7a0fdea7eb2d13c5dd5b7ff17bcb
+      size: 1587

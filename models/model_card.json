@@ -35,20 +35,20 @@
     ],
     "cv_metrics": {
         "LogisticRegression": {
-            "cv_malignant_recall": 0.9515151515151515,
-            "cv_accuracy": 0.9721999465383586,
-            "cv_roc_auc": 0.9923977722719861
+            "cv_malignant_recall": 0.9647058823529411,
+            "cv_accuracy": 0.9780219780219781,
+            "cv_roc_auc": 0.9956656346749225
         },
         "RandomForest": {
-            "cv_malignant_recall": 0.9272727272727274,
-            "cv_accuracy": 0.9559208767709169,
-            "cv_roc_auc": 0.9904262753319356
+            "cv_malignant_recall": 0.9352941176470587,
+            "cv_accuracy": 0.9582417582417582,
+            "cv_roc_auc": 0.9902992776057792
         }
     },
     "test_metrics": {
-        "malignant_recall": 0.975609756097561,
-        "accuracy": 0.9907407407407407,
-        "roc_auc": 0.995995631598107
+        "malignant_recall": 0.9761904761904762,
+        "accuracy": 0.9824561403508771,
+        "roc_auc": 0.9957010582010581
     },
     "seed": 42,
     "scikit_learn_version": "1.9.1"
